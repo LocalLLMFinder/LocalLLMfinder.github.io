@@ -1,0 +1,252 @@
+[
+  {
+    "timestamp": "2025-07-30T18:38:56.456738+00:00",
+    "rankings": [
+      {
+        "model_id": "ggml-org/models-moved",
+        "rank": 1,
+        "download_count": 2424037,
+        "rank_change": 0
+      },
+      {
+        "model_id": "mixedbread-ai/mxbai-embed-large-v1",
+        "rank": 2,
+        "download_count": 2004686,
+        "rank_change": 0
+      },
+      {
+        "model_id": "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
+        "rank": 3,
+        "download_count": 753619,
+        "rank_change": 0
+      },
+      {
+        "model_id": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+        "rank": 4,
+        "download_count": 330895,
+        "rank_change": 0
+      },
+      {
+        "model_id": "lmstudio-community/gemma-3-12b-it-GGUF",
+        "rank": 5,
+        "download_count": 296854,
+        "rank_change": 0
+      },
+      {
+        "model_id": "Isotr0py/test-gguf-sample",
+        "rank": 6,
+        "download_count": 224443,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Phi-3.5-mini-instruct-GGUF",
+        "rank": 7,
+        "download_count": 222663,
+        "rank_change": 0
+      },
+      {
+        "model_id": "google/gemma-2b",
+        "rank": 8,
+        "download_count": 210714,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Llama-3.3-70B-Instruct-GGUF",
+        "rank": 9,
+        "download_count": 204509,
+        "rank_change": 0
+      },
+      {
+        "model_id": "unsloth/gemma-3n-E4B-it-GGUF",
+        "rank": 10,
+        "download_count": 204344,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF",
+        "rank": 11,
+        "download_count": 203144,
+        "rank_change": 0
+      },
+      {
+        "model_id": "ggml-org/stories15M_MOE",
+        "rank": 12,
+        "download_count": 197208,
+        "rank_change": 0
+      },
+      {
+        "model_id": "ggml-org/tinygemma3-GGUF",
+        "rank": 13,
+        "download_count": 190037,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/gemma-3-1b-it-GGUF",
+        "rank": 14,
+        "download_count": 186550,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/gemma-2-2b-it-GGUF",
+        "rank": 15,
+        "download_count": 185440,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Qwen3-4B-GGUF",
+        "rank": 16,
+        "download_count": 184652,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF",
+        "rank": 17,
+        "download_count": 181960,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Mistral-Nemo-Instruct-2407-GGUF",
+        "rank": 18,
+        "download_count": 180187,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/phi-4-GGUF",
+        "rank": 19,
+        "download_count": 178525,
+        "rank_change": 0
+      },
+      {
+        "model_id": "TheBloke/phi-2-GGUF",
+        "rank": 20,
+        "download_count": 178269,
+        "rank_change": 0
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-07-30T18:46:56.536194+00:00",
+    "rankings": [
+      {
+        "model_id": "ggml-org/models-moved",
+        "rank": 1,
+        "download_count": 2424037,
+        "rank_change": 0
+      },
+      {
+        "model_id": "mixedbread-ai/mxbai-embed-large-v1",
+        "rank": 2,
+        "download_count": 2004686,
+        "rank_change": 0
+      },
+      {
+        "model_id": "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
+        "rank": 3,
+        "download_count": 753619,
+        "rank_change": 0
+      },
+      {
+        "model_id": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+        "rank": 4,
+        "download_count": 330895,
+        "rank_change": 0
+      },
+      {
+        "model_id": "lmstudio-community/gemma-3-12b-it-GGUF",
+        "rank": 5,
+        "download_count": 296854,
+        "rank_change": 0
+      },
+      {
+        "model_id": "Isotr0py/test-gguf-sample",
+        "rank": 6,
+        "download_count": 224443,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Phi-3.5-mini-instruct-GGUF",
+        "rank": 7,
+        "download_count": 222663,
+        "rank_change": 0
+      },
+      {
+        "model_id": "google/gemma-2b",
+        "rank": 8,
+        "download_count": 210714,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Llama-3.3-70B-Instruct-GGUF",
+        "rank": 9,
+        "download_count": 204509,
+        "rank_change": 0
+      },
+      {
+        "model_id": "unsloth/gemma-3n-E4B-it-GGUF",
+        "rank": 10,
+        "download_count": 204344,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF",
+        "rank": 11,
+        "download_count": 203144,
+        "rank_change": 0
+      },
+      {
+        "model_id": "ggml-org/stories15M_MOE",
+        "rank": 12,
+        "download_count": 197208,
+        "rank_change": 0
+      },
+      {
+        "model_id": "ggml-org/tinygemma3-GGUF",
+        "rank": 13,
+        "download_count": 190037,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/gemma-3-1b-it-GGUF",
+        "rank": 14,
+        "download_count": 186550,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/gemma-2-2b-it-GGUF",
+        "rank": 15,
+        "download_count": 185440,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Qwen3-4B-GGUF",
+        "rank": 16,
+        "download_count": 184652,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF",
+        "rank": 17,
+        "download_count": 181960,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/Mistral-Nemo-Instruct-2407-GGUF",
+        "rank": 18,
+        "download_count": 180187,
+        "rank_change": 0
+      },
+      {
+        "model_id": "MaziyarPanahi/phi-4-GGUF",
+        "rank": 19,
+        "download_count": 178525,
+        "rank_change": 0
+      },
+      {
+        "model_id": "TheBloke/phi-2-GGUF",
+        "rank": 20,
+        "download_count": 178269,
+        "rank_change": 0
+      }
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "timestamp": "2025-07-30T11:54:12.930982+00:00",
+    "duration_seconds": 145.7,
+    "recent_models_fetched": 25,
+    "top_models_updated": 20,
+    "models_merged": 40,
+    "duplicates_removed": 5,
+    "models_cleaned_up": 3,
+    "storage_freed_mb": 12.5,
+    "api_calls_made": 8,
+    "errors_encountered": [
+      "Warning: Model xyz/abc had incomplete metadata"
+    ],
+    "success": true
+  }
+]

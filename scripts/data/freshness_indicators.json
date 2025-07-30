@@ -1,0 +1,17 @@
+{
+  "lastSyncTimestamp": "2025-07-30T12:32:03.629286+00:00",
+  "lastSyncFormatted": "2025-07-30 12:32 UTC",
+  "hoursSinceSync": 0.0,
+  "overallStatus": "fresh",
+  "statusColor": "green",
+  "statusIcon": "✅",
+  "timeMessage": "Updated less than 1 hour ago",
+  "freshnessScore": 0.0,
+  "totalModels": 0,
+  "modelsWithTimestamps": 0,
+  "syncDuration": 0.3,
+  "syncMode": "full",
+  "syncSuccess": true,
+  "stalenessWarnings": [],
+  "showStalenessWarning": false
+}

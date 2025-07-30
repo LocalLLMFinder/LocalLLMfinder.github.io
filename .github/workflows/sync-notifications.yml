@@ -1,0 +1,193 @@
+name: GGUF Sync Notifications
+
+on:
+  workflow_run:
+    workflows: ["Update GGUF Models Data"]
+    types:
+      - completed
+
+jobs:
+  notify-status:
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download workflow artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Get the workflow run that triggered this
+            const workflowRun = context.payload.workflow_run;
+            console.log(`Processing workflow run: ${workflowRun.id}`);
+            console.log(`Status: ${workflowRun.conclusion}`);
+            console.log(`Duration: ${Math.round((new Date(workflowRun.updated_at) - new Date(workflowRun.created_at)) / 1000 / 60)} minutes`);
+            
+            // Create notification data
+            const notificationData = {
+              workflow_id: workflowRun.id,
+              workflow_number: workflowRun.run_number,
+              status: workflowRun.conclusion,
+              created_at: workflowRun.created_at,
+              updated_at: workflowRun.updated_at,
+              duration_minutes: Math.round((new Date(workflowRun.updated_at) - new Date(workflowRun.created_at)) / 1000 / 60),
+              html_url: workflowRun.html_url,
+              head_branch: workflowRun.head_branch,
+              head_sha: workflowRun.head_sha,
+              event: workflowRun.event,
+              actor: workflowRun.actor.login,
+              repository: context.repo.owner + '/' + context.repo.repo
+            };
+            
+            // Save notification data
+            fs.writeFileSync('notification_data.json', JSON.stringify(notificationData, null, 2));
+            
+      - name: Process notification based on status
+        run: |
+          echo "📬 Processing workflow notification..."
+          
+          # Read notification data
+          STATUS=$(jq -r '.status' notification_data.json)
+          WORKFLOW_ID=$(jq -r '.workflow_id' notification_data.json)
+          DURATION=$(jq -r '.duration_minutes' notification_data.json)
+          WORKFLOW_URL=$(jq -r '.html_url' notification_data.json)
+          ACTOR=$(jq -r '.actor' notification_data.json)
+          
+          echo "📊 Workflow Status: $STATUS"
+          echo "⏱️ Duration: $DURATION minutes"
+          echo "👤 Triggered by: $ACTOR"
+          
+          # Create status-specific notifications
+          case $STATUS in
+            "success")
+              echo "✅ GGUF Sync completed successfully"
+              
+              # Create success notification
+              echo "{
+                \"notification_type\": \"success\",
+                \"title\": \"✅ GGUF Models Sync Successful\",
+                \"message\": \"Daily GGUF models synchronization completed successfully in $DURATION minutes.\",
+                \"workflow_url\": \"$WORKFLOW_URL\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"severity\": \"info\"
+              }" > success_notification.json
+              
+              echo "📧 Success notification prepared"
+              ;;
+              
+            "failure")
+              echo "❌ GGUF Sync failed - sending critical alert"
+              
+              # Create failure notification
+              echo "{
+                \"notification_type\": \"failure\",
+                \"title\": \"🚨 CRITICAL: GGUF Models Sync Failed\",
+                \"message\": \"Daily GGUF models synchronization failed after $DURATION minutes. Immediate attention required.\",
+                \"workflow_url\": \"$WORKFLOW_URL\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"severity\": \"critical\",
+                \"action_required\": true,
+                \"troubleshooting_url\": \"https://github.com/${{ github.repository }}/blob/main/TROUBLESHOOTING.md\"
+              }" > failure_notification.json
+              
+              echo "🚨 Critical failure notification prepared"
+              ;;
+              
+            "cancelled")
+              echo "⏹️ GGUF Sync was cancelled"
+              
+              # Create cancellation notification
+              echo "{
+                \"notification_type\": \"cancelled\",
+                \"title\": \"⏹️ GGUF Models Sync Cancelled\",
+                \"message\": \"Daily GGUF models synchronization was cancelled after $DURATION minutes.\",
+                \"workflow_url\": \"$WORKFLOW_URL\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"severity\": \"warning\"
+              }" > cancelled_notification.json
+              
+              echo "⚠️ Cancellation notification prepared"
+              ;;
+              
+            *)
+              echo "❓ Unknown status: $STATUS"
+              
+              # Create unknown status notification
+              echo "{
+                \"notification_type\": \"unknown\",
+                \"title\": \"❓ GGUF Models Sync Status Unknown\",
+                \"message\": \"Daily GGUF models synchronization completed with unknown status: $STATUS\",
+                \"workflow_url\": \"$WORKFLOW_URL\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"severity\": \"warning\"
+              }" > unknown_notification.json
+              
+              echo "❓ Unknown status notification prepared"
+              ;;
+          esac
+          
+      - name: Generate notification summary
+        run: |
+          echo "📋 Generating notification summary..."
+          
+          # Create summary for GitHub
+          echo "## 📬 GGUF Sync Notification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          STATUS=$(jq -r '.status' notification_data.json)
+          WORKFLOW_ID=$(jq -r '.workflow_id' notification_data.json)
+          DURATION=$(jq -r '.duration_minutes' notification_data.json)
+          WORKFLOW_URL=$(jq -r '.html_url' notification_data.json)
+          ACTOR=$(jq -r '.actor' notification_data.json)
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          
+          echo "**Workflow ID:** $WORKFLOW_ID" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** $STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "**Duration:** $DURATION minutes" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** $ACTOR" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $TIMESTAMP" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[🔗 View Original Workflow]($WORKFLOW_URL)" >> $GITHUB_STEP_SUMMARY
+          
+          case $STATUS in
+            "success")
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ✅ Success Details" >> $GITHUB_STEP_SUMMARY
+              echo "- Models data updated successfully" >> $GITHUB_STEP_SUMMARY
+              echo "- Search index regenerated" >> $GITHUB_STEP_SUMMARY
+              echo "- Website will be updated automatically" >> $GITHUB_STEP_SUMMARY
+              ;;
+            "failure")
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🚨 Failure Alert" >> $GITHUB_STEP_SUMMARY
+              echo "- **CRITICAL:** Daily sync failed" >> $GITHUB_STEP_SUMMARY
+              echo "- Previous data remains intact" >> $GITHUB_STEP_SUMMARY
+              echo "- Manual intervention may be required" >> $GITHUB_STEP_SUMMARY
+              echo "- Check logs for detailed error information" >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac
+          
+          echo "📧 Notification summary generated"
+          
+      - name: Log notification for monitoring
+        run: |
+          echo "📝 Logging notification for monitoring systems..."
+          
+          # Create a structured log entry
+          STATUS=$(jq -r '.status' notification_data.json)
+          WORKFLOW_ID=$(jq -r '.workflow_id' notification_data.json)
+          DURATION=$(jq -r '.duration_minutes' notification_data.json)
+          
+          # Log to GitHub Actions
+          echo "NOTIFICATION_STATUS=$STATUS" >> $GITHUB_ENV
+          echo "NOTIFICATION_WORKFLOW_ID=$WORKFLOW_ID" >> $GITHUB_ENV
+          echo "NOTIFICATION_DURATION=$DURATION" >> $GITHUB_ENV
+          
+          # Create monitoring log entry
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) [NOTIFICATION] status=$STATUS workflow_id=$WORKFLOW_ID duration=${DURATION}min" >> monitoring.log
+          
+          echo "📊 Notification logged for monitoring"

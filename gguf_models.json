@@ -1,0 +1,70 @@
+[
+  {
+    "modelId": "microsoft/DialoGPT-medium",
+    "files": [
+      {
+        "filename": "DialoGPT-medium.Q4_K_M.gguf"
+      },
+      {
+        "filename": "DialoGPT-medium.Q8_0.gguf"
+      }
+    ],
+    "downloads": 15420,
+    "lastModified": "2024-01-15T10:30:00Z"
+  },
+  {
+    "modelId": "meta-llama/Llama-2-7b-chat-hf",
+    "files": [
+      {
+        "filename": "Llama-2-7b-chat.Q4_K_M.gguf"
+      },
+      {
+        "filename": "Llama-2-7b-chat.Q8_0.gguf"
+      },
+      {
+        "filename": "Llama-2-7b-chat.F16.gguf"
+      }
+    ],
+    "downloads": 89234,
+    "lastModified": "2024-01-20T14:45:00Z"
+  },
+  {
+    "modelId": "mistralai/Mistral-7B-Instruct-v0.1",
+    "files": [
+      {
+        "filename": "Mistral-7B-Instruct-v0.1.Q4_K_M.gguf"
+      },
+      {
+        "filename": "Mistral-7B-Instruct-v0.1.Q6_K.gguf"
+      }
+    ],
+    "downloads": 67891,
+    "lastModified": "2024-01-18T09:15:00Z"
+  },
+  {
+    "modelId": "microsoft/phi-2",
+    "files": [
+      {
+        "filename": "phi-2.Q4_K_M.gguf"
+      },
+      {
+        "filename": "phi-2.Q8_0.gguf"
+      }
+    ],
+    "downloads": 34567,
+    "lastModified": "2024-01-22T16:20:00Z"
+  },
+  {
+    "modelId": "google/gemma-7b-it",
+    "files": [
+      {
+        "filename": "gemma-7b-it.Q4_K_M.gguf"
+      },
+      {
+        "filename": "gemma-7b-it.Q8_0.gguf"
+      }
+    ],
+    "downloads": 45123,
+    "lastModified": "2024-01-25T11:30:00Z"
+  }
+]

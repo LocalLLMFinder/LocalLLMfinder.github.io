@@ -1,0 +1,29 @@
+[
+  {
+    "model_id": "microsoft/DialoGPT-medium",
+    "first_seen": "2025-07-28T11:54:12.930982+00:00",
+    "last_updated": "2025-07-30T11:54:12.930982+00:00",
+    "source": "recent",
+    "download_count": 1500,
+    "retention_reason": "recent",
+    "cleanup_eligible": true
+  },
+  {
+    "model_id": "openai/gpt-3.5-turbo",
+    "first_seen": "2025-07-15T11:54:12.930982+00:00",
+    "last_updated": "2025-07-30T11:54:12.930982+00:00",
+    "source": "top",
+    "download_count": 50000,
+    "retention_reason": "top_20",
+    "cleanup_eligible": false
+  },
+  {
+    "model_id": "huggingface/CodeBERTa-small-v1",
+    "first_seen": "2025-06-25T11:54:12.930982+00:00",
+    "last_updated": "2025-06-30T11:54:12.930982+00:00",
+    "source": "recent",
+    "download_count": 800,
+    "retention_reason": "recent",
+    "cleanup_eligible": true
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "model_id": "microsoft/DialoGPT-medium",
+    "filename": "DialoGPT-medium.Q4_K_M.gguf",
+    "estimated_size_bytes": 2147483648,
+    "url": "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/DialoGPT-medium.Q4_K_M.gguf"
+  },
+  {
+    "model_id": "microsoft/DialoGPT-medium",
+    "filename": "DialoGPT-medium.Q8_0.gguf",
+    "estimated_size_bytes": 4294967296,
+    "url": "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/DialoGPT-medium.Q8_0.gguf"
+  },
+  {
+    "model_id": "meta-llama/Llama-2-7b-chat-hf",
+    "filename": "Llama-2-7b-chat.Q4_K_M.gguf",
+    "estimated_size_bytes": 4026531840,
+    "url": "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/resolve/main/Llama-2-7b-chat.Q4_K_M.gguf"
+  },
+  {
+    "model_id": "meta-llama/Llama-2-7b-chat-hf",
+    "filename": "Llama-2-7b-chat.Q8_0.gguf",
+    "estimated_size_bytes": 7516192768,
+    "url": "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/resolve/main/Llama-2-7b-chat.Q8_0.gguf"
+  },
+  {
+    "model_id": "meta-llama/Llama-2-7b-chat-hf",
+    "filename": "Llama-2-7b-chat.F16.gguf",
+    "estimated_size_bytes": 13958643712,
+    "url": "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/resolve/main/Llama-2-7b-chat.F16.gguf"
+  },
+  {
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.1",
+    "filename": "Mistral-7B-Instruct-v0.1.Q4_K_M.gguf",
+    "estimated_size_bytes": 4026531840,
+    "url": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1/resolve/main/Mistral-7B-Instruct-v0.1.Q4_K_M.gguf"
+  },
+  {
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.1",
+    "filename": "Mistral-7B-Instruct-v0.1.Q6_K.gguf",
+    "estimated_size_bytes": 5905580032,
+    "url": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1/resolve/main/Mistral-7B-Instruct-v0.1.Q6_K.gguf"
+  },
+  {
+    "model_id": "microsoft/phi-2",
+    "filename": "phi-2.Q4_K_M.gguf",
+    "estimated_size_bytes": 1610612736,
+    "url": "https://huggingface.co/microsoft/phi-2/resolve/main/phi-2.Q4_K_M.gguf"
+  },
+  {
+    "model_id": "microsoft/phi-2",
+    "filename": "phi-2.Q8_0.gguf",
+    "estimated_size_bytes": 2952790016,
+    "url": "https://huggingface.co/microsoft/phi-2/resolve/main/phi-2.Q8_0.gguf"
+  },
+  {
+    "model_id": "google/gemma-7b-it",
+    "filename": "gemma-7b-it.Q4_K_M.gguf",
+    "estimated_size_bytes": 4563402752,
+    "url": "https://huggingface.co/google/gemma-7b-it/resolve/main/gemma-7b-it.Q4_K_M.gguf"
+  },
+  {
+    "model_id": "google/gemma-7b-it",
+    "filename": "gemma-7b-it.Q8_0.gguf",
+    "estimated_size_bytes": 8053063680,
+    "url": "https://huggingface.co/google/gemma-7b-it/resolve/main/gemma-7b-it.Q8_0.gguf"
+  }
+]

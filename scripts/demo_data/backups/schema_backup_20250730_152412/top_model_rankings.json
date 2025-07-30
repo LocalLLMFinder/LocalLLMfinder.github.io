@@ -1,0 +1,20 @@
+[
+  {
+    "model_id": "openai/gpt-3.5-turbo",
+    "rank": 1,
+    "download_count": 50000,
+    "previous_rank": 2,
+    "rank_change": 1,
+    "days_in_top": 30,
+    "first_top_date": "2025-07-30T11:54:12.930982+00:00"
+  },
+  {
+    "model_id": "microsoft/DialoGPT-medium",
+    "rank": 15,
+    "download_count": 1500,
+    "previous_rank": null,
+    "rank_change": 0,
+    "days_in_top": 1,
+    "first_top_date": "2025-07-30T11:54:12.930982+00:00"
+  }
+]

@@ -1,0 +1,94 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Data files (optional - you might want to commit some)
+data/backups/
+data/fallback/
+reports/
+*.json.bak
+
+# Test files (exclude most test files)
+test_*.py
+*_test.py
+validate_*.py
+run_*_tests.py
+demo_*.py
+debug_*.py
+TASK_*_SUMMARY.md
+TASK_*_IMPLEMENTATION_SUMMARY.md
+
+# Spec files (development only)
+.kiro/
+specs/
+
+# Keep only essential test files
+!test_github_actions_deployment.py
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/

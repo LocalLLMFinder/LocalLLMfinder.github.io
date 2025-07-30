@@ -1,0 +1,87 @@
+api_base_url: https://huggingface.co
+custom_settings: {}
+debug_mode: false
+dry_run: false
+enable_github_actions_integration: true
+enable_pages_deployment: true
+environment: development
+error_handling:
+  enable_categorized_errors: true
+  enable_error_recovery: true
+  enable_exponential_backoff: true
+  enable_notifications: true
+  max_recovery_attempts: 3
+  preserve_data_on_failure: true
+  recovery_delay_seconds: 60
+huggingface_token: null
+log_level: INFO
+monitoring:
+  alert_channels:
+  - log
+  - github
+  enable_alerts: true
+  enable_dashboard: false
+  enable_detailed_logging: true
+  enable_performance_metrics: true
+  enable_progress_tracking: true
+  progress_report_interval_seconds: 900
+notifications:
+  email_recipients: []
+  enable_critical_notifications: true
+  enable_failure_notifications: true
+  enable_success_notifications: false
+  enable_warning_notifications: true
+  notification_channels:
+  - log
+  webhook_urls: []
+performance:
+  cache_ttl_hours: 24
+  chunk_size: 100
+  enable_adaptive_parameters: true
+  enable_caching: true
+  enable_data_compression: true
+  enable_parallel_processing: true
+  enable_streaming_processing: true
+  memory_limit_mb: 2048
+rate_limiting:
+  backoff_base: 2.0
+  backoff_jitter: true
+  max_concurrent_requests: 50
+  max_retries: 5
+  requests_per_hour: 5000
+  requests_per_second: 1.2
+  timeout_seconds: 30
+security:
+  allowed_domains:
+  - huggingface.co
+  enable_audit_logging: true
+  enable_rate_limit_protection: true
+  enable_request_signing: false
+  enable_token_validation: true
+  mask_sensitive_data: true
+storage:
+  backup_directory: data/backups
+  backup_retention_days: 30
+  data_directory: data
+  enable_backups: true
+  enable_compression: true
+  logs_directory: logs
+  reports_directory: reports
+sync_behavior:
+  enable_deduplication: true
+  enable_multi_strategy_discovery: true
+  force_full_sync: false
+  full_sync_threshold_hours: 168
+  incremental_window_hours: 48
+  mode: auto
+  significant_change_threshold: 0.1
+user_agent: GGUF-Models-Sync/1.0
+validation:
+  enable_automatic_fixes: true
+  enable_completeness_checking: true
+  enable_file_verification: true
+  enable_quality_scoring: true
+  enable_schema_validation: true
+  min_completeness_score: 0.95
+  validation_timeout_seconds: 300
+workflow_timeout_hours: 6

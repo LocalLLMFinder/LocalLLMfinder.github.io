@@ -1,0 +1,268 @@
+name: Deployment Notifications
+
+on:
+  workflow_run:
+    workflows: ["Deploy to GitHub Pages", "Update GGUF Models Data"]
+    types:
+      - completed
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    
+    steps:
+      - name: Get workflow details
+        id: workflow
+        run: |
+          echo "workflow_name=${{ github.event.workflow_run.name }}" >> $GITHUB_OUTPUT
+          echo "workflow_status=${{ github.event.workflow_run.conclusion }}" >> $GITHUB_OUTPUT
+          echo "workflow_url=${{ github.event.workflow_run.html_url }}" >> $GITHUB_OUTPUT
+          echo "commit_sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+      
+      - name: Create issue for failed deployment
+        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowName = '${{ steps.workflow.outputs.workflow_name }}';
+            const workflowUrl = '${{ steps.workflow.outputs.workflow_url }}';
+            const commitSha = '${{ steps.workflow.outputs.commit_sha }}';
+            
+            const title = `🚨 ${workflowName} Failed`;
+            const body = `
+            ## Deployment Failure Alert
+            
+            **Workflow:** ${workflowName}
+            **Status:** Failed ❌
+            **Commit:** ${commitSha}
+            **Workflow Run:** [View Details](${workflowUrl})
+            **Time:** ${new Date().toISOString()}
+            
+            ### Immediate Actions Required:
+            
+            1. **Check the workflow logs** for specific error messages
+            2. **Verify all dependencies** are properly installed
+            3. **Check for any breaking changes** in the recent commits
+            4. **Test the build locally** before pushing fixes
+            
+            ### Common Issues:
+            
+            - **Data Pipeline Failures:**
+              - Hugging Face API rate limits
+              - Network connectivity issues
+              - Invalid model data format
+            
+            - **Build Failures:**
+              - Missing dependencies
+              - Syntax errors in code
+              - Configuration issues
+            
+            - **Deployment Failures:**
+              - GitHub Pages configuration
+              - Permission issues
+              - Large file size limits
+            
+            ### Recovery Steps:
+            
+            1. Fix the identified issue
+            2. Test locally with \`npm run build\` and \`python scripts/test_pipeline.py\`
+            3. Commit and push the fix
+            4. Monitor the next workflow run
+            
+            ---
+            
+            *This issue was automatically created by the deployment monitoring system.*
+            *Please close this issue once the problem is resolved.*
+            `;
+            
+            // Check if similar issue already exists
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'deployment-failure'
+            });
+            
+            const similarIssue = existingIssues.data.find(issue => 
+              issue.title.includes(workflowName) && 
+              issue.created_at > new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            );
+            
+            if (!similarIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['deployment-failure', 'bug', 'high-priority']
+              });
+              
+              console.log('Created deployment failure issue');
+            } else {
+              console.log('Similar issue already exists, skipping creation');
+            }
+      
+      - name: Send Slack notification
+        if: ${{ github.event.workflow_run.conclusion == 'failure' && secrets.SLACK_WEBHOOK_URL }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🚨 **Deployment Failed**
+            
+            **Workflow:** ${{ steps.workflow.outputs.workflow_name }}
+            **Repository:** ${{ github.repository }}
+            **Commit:** ${{ steps.workflow.outputs.commit_sha }}
+            **Details:** ${{ steps.workflow.outputs.workflow_url }}
+            
+            Please check the logs and fix the issue immediately.
+      
+      - name: Send email notification
+        if: ${{ github.event.workflow_run.conclusion == 'failure' && secrets.EMAIL_RECIPIENT }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚨 GGUF Model Discovery - Deployment Failed"
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: "GitHub Actions <noreply@github.com>"
+          body: |
+            Deployment failure detected for GGUF Model Discovery website.
+            
+            Workflow: ${{ steps.workflow.outputs.workflow_name }}
+            Status: Failed
+            Repository: ${{ github.repository }}
+            Commit: ${{ steps.workflow.outputs.commit_sha }}
+            
+            Please check the workflow logs for details:
+            ${{ steps.workflow.outputs.workflow_url }}
+            
+            This is an automated notification from GitHub Actions.
+
+  health-check:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Wait for deployment
+        run: sleep 60  # Wait for GitHub Pages to update
+      
+      - name: Run health check
+        run: |
+          # Basic health check
+          SITE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          
+          echo "🏥 Running health check for $SITE_URL"
+          
+          # Check if site is accessible
+          if curl -f -s "$SITE_URL" > /dev/null; then
+            echo "✅ Site is accessible"
+          else
+            echo "❌ Site is not accessible"
+            exit 1
+          fi
+          
+          # Check if data files exist
+          if curl -f -s "$SITE_URL/gguf_models.json" > /dev/null; then
+            echo "✅ Data files are accessible"
+          else
+            echo "❌ Data files are not accessible"
+            exit 1
+          fi
+          
+          # Check response time
+          RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "$SITE_URL")
+          echo "⏱️ Response time: ${RESPONSE_TIME}s"
+          
+          if (( $(echo "$RESPONSE_TIME < 5.0" | bc -l) )); then
+            echo "✅ Response time is acceptable"
+          else
+            echo "⚠️ Response time is slow"
+          fi
+          
+          echo "🎉 Health check completed successfully"
+      
+      - name: Update status badge
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Update README with deployment status
+            const fs = require('fs');
+            const path = 'README.md';
+            
+            if (fs.existsSync(path)) {
+              let content = fs.readFileSync(path, 'utf8');
+              const timestamp = new Date().toISOString();
+              const badge = `![Deployment Status](https://img.shields.io/badge/deployment-success-brightgreen?style=flat-square&logo=github) ![Last Updated](https://img.shields.io/badge/last%20updated-${timestamp.split('T')[0]}-blue?style=flat-square)`;
+              
+              // Replace existing badges or add new ones
+              if (content.includes('![Deployment Status]')) {
+                content = content.replace(/!\[Deployment Status\][^\n]*\n?/g, '');
+                content = content.replace(/!\[Last Updated\][^\n]*\n?/g, '');
+              }
+              
+              // Add badges after the title
+              content = content.replace(/^(# [^\n]+\n)/, `$1\n${badge}\n`);
+              
+              fs.writeFileSync(path, content);
+              console.log('Updated deployment status badge');
+            }
+
+  performance-monitoring:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run performance audit
+        run: |
+          SITE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          
+          echo "🚀 Running performance audit for $SITE_URL"
+          
+          # Install Lighthouse CI
+          npm install -g @lhci/cli@0.12.x
+          
+          # Run Lighthouse audit
+          lhci autorun --upload.target=temporary-public-storage --collect.url="$SITE_URL" || true
+          
+          echo "📊 Performance audit completed"
+      
+      - name: Check bundle size
+        run: |
+          npm run build
+          
+          echo "📦 Bundle size analysis:"
+          find dist -name "*.js" -exec ls -lh {} \; | awk '{print $5 "\t" $9}'
+          find dist -name "*.css" -exec ls -lh {} \; | awk '{print $5 "\t" $9}'
+          
+          # Check if bundle is too large
+          TOTAL_SIZE=$(find dist -type f \( -name "*.js" -o -name "*.css" \) -exec stat -c%s {} \; | awk '{sum+=$1} END {print sum}')
+          TOTAL_SIZE_MB=$(echo "scale=2; $TOTAL_SIZE / 1024 / 1024" | bc)
+          
+          echo "Total bundle size: ${TOTAL_SIZE_MB}MB"
+          
+          if (( $(echo "$TOTAL_SIZE_MB > 2.0" | bc -l) )); then
+            echo "⚠️ Bundle size is large (${TOTAL_SIZE_MB}MB)"
+          else
+            echo "✅ Bundle size is acceptable (${TOTAL_SIZE_MB}MB)"
+          fi

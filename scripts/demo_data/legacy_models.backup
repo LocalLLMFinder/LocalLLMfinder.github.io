@@ -1,0 +1,14 @@
+[
+  {
+    "id": "facebook/bart-large",
+    "downloads": 2500
+  },
+  {
+    "id": "google/bert-base-uncased",
+    "downloads": 15000
+  },
+  {
+    "id": "microsoft/DialoGPT-small",
+    "downloads": 800
+  }
+]

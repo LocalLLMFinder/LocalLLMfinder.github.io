@@ -1,0 +1,29 @@
+[
+  {
+    "model_id": "facebook/bart-large",
+    "first_seen": "2025-07-30T11:54:12.978335+00:00",
+    "last_updated": "2025-07-30T11:54:12.978335+00:00",
+    "source": "recent",
+    "download_count": 2500,
+    "retention_reason": "recent",
+    "cleanup_eligible": true
+  },
+  {
+    "model_id": "google/bert-base-uncased",
+    "first_seen": "2025-07-30T11:54:12.978335+00:00",
+    "last_updated": "2025-07-30T11:54:12.978335+00:00",
+    "source": "recent",
+    "download_count": 15000,
+    "retention_reason": "recent",
+    "cleanup_eligible": true
+  },
+  {
+    "model_id": "microsoft/DialoGPT-small",
+    "first_seen": "2025-07-30T11:54:12.978335+00:00",
+    "last_updated": "2025-07-30T11:54:12.978335+00:00",
+    "source": "recent",
+    "download_count": 800,
+    "retention_reason": "recent",
+    "cleanup_eligible": true
+  }
+]

@@ -1,0 +1,430 @@
+name: Update GGUF Models Data
+
+on:
+  schedule:
+    # Run daily at exactly 23:59 UTC
+    - cron: '59 23 * * *'
+  workflow_dispatch:  # Allow manual triggering for testing
+    inputs:
+      sync_mode:
+        description: 'Sync mode (incremental or full)'
+        required: false
+        default: 'incremental'
+        type: choice
+        options:
+        - incremental
+        - full
+      max_concurrency:
+        description: 'Maximum concurrent requests'
+        required: false
+        default: '50'
+        type: string
+      timeout_hours:
+        description: 'Workflow timeout in hours'
+        required: false
+        default: '6'
+        type: string
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours maximum
+    
+    permissions:
+      contents: write  # Required to commit changes
+      pages: write     # Required for GitHub Pages deployment
+      id-token: write  # Required for OIDC
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Full history for better git operations
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'  # Cache pip dependencies
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+          
+      - name: Set up enhanced environment variables
+        run: |
+          echo "SYNC_MODE=${{ github.event.inputs.sync_mode || 'incremental' }}" >> $GITHUB_ENV
+          echo "MAX_CONCURRENCY=${{ github.event.inputs.max_concurrency || '50' }}" >> $GITHUB_ENV
+          echo "TIMEOUT_HOURS=${{ github.event.inputs.timeout_hours || '6' }}" >> $GITHUB_ENV
+          echo "WORKFLOW_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+          echo "WORKFLOW_RUN_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "WORKFLOW_START_TIME=$(date -u +%s)" >> $GITHUB_ENV
+          echo "GITHUB_REPOSITORY=${{ github.repository }}" >> $GITHUB_ENV
+          echo "GITHUB_REF=${{ github.ref }}" >> $GITHUB_ENV
+          
+      - name: Initialize performance metrics
+        run: |
+          mkdir -p reports
+          echo "{
+            \"workflow_id\": \"${{ github.run_id }}\",
+            \"workflow_number\": \"${{ github.run_number }}\",
+            \"start_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"sync_mode\": \"$SYNC_MODE\",
+            \"max_concurrency\": $MAX_CONCURRENCY,
+            \"timeout_hours\": $TIMEOUT_HOURS,
+            \"repository\": \"${{ github.repository }}\",
+            \"ref\": \"${{ github.ref }}\",
+            \"trigger\": \"${{ github.event_name }}\"
+          }" > reports/workflow_metrics.json
+          
+      - name: Fetch and process GGUF models data with retry logic
+        env:
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          SYNC_MODE: ${{ env.SYNC_MODE }}
+          MAX_CONCURRENCY: ${{ env.MAX_CONCURRENCY }}
+          TIMEOUT_HOURS: ${{ env.TIMEOUT_HOURS }}
+          WORKFLOW_RUN_ID: ${{ env.WORKFLOW_RUN_ID }}
+          ENABLE_PERFORMANCE_METRICS: "true"
+          ENABLE_DETAILED_LOGGING: "true"
+          PROGRESS_REPORT_INTERVAL: "900"  # 15 minutes
+        run: |
+          # Retry logic for the main sync process
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+            echo "🚀 Starting sync attempt $((RETRY_COUNT + 1))/$MAX_RETRIES"
+            echo "📊 Sync mode: $SYNC_MODE"
+            echo "⚡ Max concurrency: $MAX_CONCURRENCY"
+            echo "⏱️ Timeout: $TIMEOUT_HOURS hours"
+            
+            # Record attempt start time
+            echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_start.txt
+            
+            if timeout ${TIMEOUT_HOURS}h python scripts/update_models.py; then
+              echo "✅ Sync completed successfully on attempt $((RETRY_COUNT + 1))"
+              SUCCESS=true
+              
+              # Record success metrics
+              echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_success.txt
+            else
+              EXIT_CODE=$?
+              echo "❌ Sync failed on attempt $((RETRY_COUNT + 1)) with exit code $EXIT_CODE"
+              
+              # Record failure metrics
+              echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_failure.txt
+              echo "$EXIT_CODE" > reports/attempt_${RETRY_COUNT}_exit_code.txt
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                # Exponential backoff with jitter
+                WAIT_TIME=$((2 ** RETRY_COUNT * 60 + RANDOM % 60))
+                echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
+                sleep $WAIT_TIME
+              fi
+            fi
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "💥 All sync attempts failed after $MAX_RETRIES retries"
+            
+            # Create failure report
+            echo "{
+              \"status\": \"failed\",
+              \"total_attempts\": $MAX_RETRIES,
+              \"failure_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"workflow_id\": \"$WORKFLOW_RUN_ID\"
+            }" > reports/sync_failure_report.json
+            
+            exit 1
+          fi
+          
+      - name: Collect performance metrics and verify files
+        run: |
+          echo "📊 Collecting performance metrics and verifying generated files..."
+          
+          # Calculate workflow duration
+          START_TIME=$(cat reports/attempt_0_start.txt 2>/dev/null || echo "$WORKFLOW_START_TIME")
+          END_TIME=$(date -u +%s)
+          DURATION=$((END_TIME - START_TIME))
+          
+          # Count successful and failed attempts
+          SUCCESSFUL_ATTEMPTS=$(ls reports/attempt_*_success.txt 2>/dev/null | wc -l)
+          FAILED_ATTEMPTS=$(ls reports/attempt_*_failure.txt 2>/dev/null | wc -l)
+          TOTAL_ATTEMPTS=$((SUCCESSFUL_ATTEMPTS + FAILED_ATTEMPTS))
+          
+          echo "⏱️ Total workflow duration: ${DURATION} seconds"
+          echo "🔄 Total attempts: $TOTAL_ATTEMPTS"
+          echo "✅ Successful attempts: $SUCCESSFUL_ATTEMPTS"
+          echo "❌ Failed attempts: $FAILED_ATTEMPTS"
+          
+          # Verify generated files and collect metrics
+          MODELS_COUNT=0
+          SEARCH_INDEX_SIZE=0
+          SITEMAP_SIZE=0
+          FILES_STATUS="success"
+          
+          echo "🔍 Checking generated files..."
+          ls -la data/
+          
+          if [ -f "data/models.json" ]; then
+            echo "✓ models.json generated"
+            MODELS_COUNT=$(jq -r '.metadata.totalModels // 0' data/models.json)
+            echo "📈 Models count: $MODELS_COUNT"
+          else
+            echo "✗ models.json missing"
+            FILES_STATUS="failed"
+          fi
+          
+          if [ -f "data/search-index.json" ]; then
+            echo "✓ search-index.json generated"
+            SEARCH_INDEX_SIZE=$(stat -c%s "data/search-index.json" 2>/dev/null || echo "0")
+            echo "📦 Search index size: $SEARCH_INDEX_SIZE bytes"
+          else
+            echo "✗ search-index.json missing"
+            FILES_STATUS="failed"
+          fi
+          
+          if [ -f "sitemap.xml" ]; then
+            echo "✓ sitemap.xml generated"
+            SITEMAP_SIZE=$(stat -c%s "sitemap.xml" 2>/dev/null || echo "0")
+            echo "🗺️ Sitemap size: $SITEMAP_SIZE bytes"
+          else
+            echo "✗ sitemap.xml missing"
+            FILES_STATUS="failed"
+          fi
+          
+          # Create comprehensive performance report
+          echo "{
+            \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+            \"workflow_number\": \"${{ github.run_number }}\",
+            \"start_time\": \"$(date -d @$START_TIME -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"end_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"duration_seconds\": $DURATION,
+            \"duration_minutes\": $((DURATION / 60)),
+            \"sync_mode\": \"$SYNC_MODE\",
+            \"max_concurrency\": $MAX_CONCURRENCY,
+            \"timeout_hours\": $TIMEOUT_HOURS,
+            \"total_attempts\": $TOTAL_ATTEMPTS,
+            \"successful_attempts\": $SUCCESSFUL_ATTEMPTS,
+            \"failed_attempts\": $FAILED_ATTEMPTS,
+            \"files_status\": \"$FILES_STATUS\",
+            \"models_count\": $MODELS_COUNT,
+            \"search_index_size_bytes\": $SEARCH_INDEX_SIZE,
+            \"sitemap_size_bytes\": $SITEMAP_SIZE,
+            \"repository\": \"${{ github.repository }}\",
+            \"ref\": \"${{ github.ref }}\",
+            \"trigger\": \"${{ github.event_name }}\",
+            \"runner_os\": \"${{ runner.os }}\",
+            \"github_actor\": \"${{ github.actor }}\"
+          }" > reports/performance_report.json
+          
+          # Display performance summary
+          echo "📊 Performance Summary:"
+          echo "   Duration: $((DURATION / 60)) minutes ($DURATION seconds)"
+          echo "   Models processed: $MODELS_COUNT"
+          echo "   Success rate: $SUCCESSFUL_ATTEMPTS/$TOTAL_ATTEMPTS attempts"
+          echo "   Files status: $FILES_STATUS"
+          
+          # Exit with error if files are missing
+          if [ "$FILES_STATUS" = "failed" ]; then
+            echo "💥 Critical files missing - workflow failed"
+            exit 1
+          fi
+          
+      - name: Commit and push changes with enhanced reporting
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add all generated files including reports
+          git add data/
+          git add sitemap.xml
+          git add robots.txt
+          git add reports/
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "📝 No changes to commit - data is up to date"
+            
+            # Still create a status report for no-change scenarios
+            echo "{
+              \"status\": \"no_changes\",
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+              \"sync_mode\": \"$SYNC_MODE\"
+            }" > reports/no_changes_report.json
+          else
+            # Get metrics for commit message
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+            MODELS_COUNT=$(jq -r '.metadata.totalModels // 0' data/models.json)
+            DURATION=$(jq -r '.duration_minutes // 0' reports/performance_report.json)
+            ATTEMPTS=$(jq -r '.total_attempts // 1' reports/performance_report.json)
+            
+            # Enhanced commit message with performance metrics
+            git commit -m "🤖 Update GGUF models data - $TIMESTAMP
+
+            📊 Sync Summary:
+            - Models: $MODELS_COUNT total
+            - Mode: $SYNC_MODE sync
+            - Duration: ${DURATION} minutes
+            - Attempts: $ATTEMPTS
+            - Concurrency: $MAX_CONCURRENCY
+            
+            📁 Files Updated:
+            - Generated fresh search index
+            - Updated sitemap for SEO
+            - Performance metrics included
+            
+            🔗 Workflow: https://github.com/${{ github.repository }}/actions/runs/$WORKFLOW_RUN_ID"
+            
+            # Enhanced push with retry logic and better error handling
+            PUSH_SUCCESS=false
+            for i in {1..5}; do
+              echo "📤 Attempting to push changes (attempt $i/5)..."
+              
+              if git push; then
+                echo "✅ Successfully pushed changes on attempt $i"
+                PUSH_SUCCESS=true
+                
+                # Record successful push
+                echo "{
+                  \"status\": \"success\",
+                  \"push_attempt\": $i,
+                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                }" > reports/push_success.json
+                break
+              else
+                echo "⚠️ Push failed on attempt $i/5"
+                
+                if [ $i -lt 5 ]; then
+                  # Exponential backoff: 10, 20, 40, 80 seconds
+                  WAIT_TIME=$((10 * (2 ** (i - 1))))
+                  echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
+                  sleep $WAIT_TIME
+                  
+                  # Try to pull and rebase in case of conflicts
+                  echo "🔄 Attempting to pull and rebase..."
+                  git pull --rebase origin main || true
+                fi
+              fi
+            done
+            
+            if [ "$PUSH_SUCCESS" = false ]; then
+              echo "💥 Failed to push changes after 5 attempts"
+              
+              # Record push failure
+              echo "{
+                \"status\": \"failed\",
+                \"total_attempts\": 5,
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"workflow_id\": \"$WORKFLOW_RUN_ID\"
+              }" > reports/push_failure.json
+              
+              exit 1
+            fi
+          fi
+          
+      - name: Generate workflow summary and notifications
+        if: always()  # Run even if previous steps failed
+        run: |
+          echo "📋 Generating workflow summary and notifications..."
+          
+          # Determine overall workflow status
+          WORKFLOW_STATUS="success"
+          if [ -f "reports/sync_failure_report.json" ] || [ -f "reports/push_failure.json" ]; then
+            WORKFLOW_STATUS="failed"
+          fi
+          
+          # Get final metrics
+          MODELS_COUNT=$(jq -r '.metadata.totalModels // 0' data/models.json 2>/dev/null || echo "0")
+          DURATION=$(jq -r '.duration_minutes // 0' reports/performance_report.json 2>/dev/null || echo "0")
+          ATTEMPTS=$(jq -r '.total_attempts // 1' reports/performance_report.json 2>/dev/null || echo "1")
+          
+          # Create comprehensive workflow summary
+          echo "## 🤖 GGUF Models Sync Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow ID:** $WORKFLOW_RUN_ID" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** $WORKFLOW_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "**Sync Mode:** $SYNC_MODE" >> $GITHUB_STEP_SUMMARY
+          echo "**Duration:** ${DURATION} minutes" >> $GITHUB_STEP_SUMMARY
+          echo "**Models Processed:** $MODELS_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "**Attempts:** $ATTEMPTS" >> $GITHUB_STEP_SUMMARY
+          echo "**Max Concurrency:** $MAX_CONCURRENCY" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$WORKFLOW_STATUS" = "success" ]; then
+            echo "### ✅ Sync Completed Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- All models were processed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "- Data files were generated and committed" >> $GITHUB_STEP_SUMMARY
+            echo "- Search index and sitemap updated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Sync Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- Check the logs for detailed error information" >> $GITHUB_STEP_SUMMARY
+            echo "- Performance metrics have been preserved" >> $GITHUB_STEP_SUMMARY
+            echo "- Previous data remains intact" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Performance Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Duration | ${DURATION} minutes |" >> $GITHUB_STEP_SUMMARY
+          echo "| Models | $MODELS_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Attempts | $ATTEMPTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Concurrency | $MAX_CONCURRENCY |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sync Mode | $SYNC_MODE |" >> $GITHUB_STEP_SUMMARY
+          
+          # Create final status report
+          echo "{
+            \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+            \"workflow_number\": \"${{ github.run_number }}\",
+            \"status\": \"$WORKFLOW_STATUS\",
+            \"completion_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"sync_mode\": \"$SYNC_MODE\",
+            \"models_count\": $MODELS_COUNT,
+            \"duration_minutes\": $DURATION,
+            \"total_attempts\": $ATTEMPTS,
+            \"max_concurrency\": $MAX_CONCURRENCY,
+            \"repository\": \"${{ github.repository }}\",
+            \"trigger\": \"${{ github.event_name }}\",
+            \"github_actor\": \"${{ github.actor }}\",
+            \"workflow_url\": \"https://github.com/${{ github.repository }}/actions/runs/$WORKFLOW_RUN_ID\"
+          }" > reports/workflow_summary.json
+          
+          echo "📋 Workflow summary generated successfully"
+          
+      - name: Trigger Pages deployment
+        if: success()  # Only trigger if workflow succeeded
+        run: |
+          echo "✅ Data update complete. GitHub Pages deployment will be triggered automatically."
+          echo "🔗 Workflow details: https://github.com/${{ github.repository }}/actions/runs/$WORKFLOW_RUN_ID"
+          
+      - name: Preserve reports on failure
+        if: failure()
+        run: |
+          echo "💾 Preserving failure reports for analysis..."
+          
+          # Ensure reports directory exists and has proper permissions
+          mkdir -p reports
+          chmod 755 reports
+          
+          # Create failure summary if it doesn't exist
+          if [ ! -f "reports/workflow_summary.json" ]; then
+            echo "{
+              \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+              \"status\": \"failed\",
+              \"failure_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"sync_mode\": \"$SYNC_MODE\",
+              \"max_concurrency\": \"$MAX_CONCURRENCY\"
+            }" > reports/workflow_summary.json
+          fi
+          
+          echo "📊 Failure reports preserved in reports/ directory"
