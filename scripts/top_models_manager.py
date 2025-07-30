@@ -35,6 +35,10 @@ class ModelReference:
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ModelReference to dictionary for JSON serialization."""
+        return asdict(self)
 
 @dataclass
 class TopModelRanking:
@@ -67,6 +71,18 @@ class TopModelsUpdateResult:
     dropped_entries: int
     success: bool
     error_message: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert TopModelsUpdateResult to dictionary for JSON serialization."""
+        result = asdict(self)
+        
+        # Convert ModelReference and TopModelRanking objects to dicts
+        if self.models:
+            result['models'] = [asdict(model) for model in self.models]
+        if self.rankings:
+            result['rankings'] = [ranking.to_dict() if hasattr(ranking, 'to_dict') else asdict(ranking) for ranking in self.rankings]
+        
+        return result
 
 class TopModelsManager:
     """

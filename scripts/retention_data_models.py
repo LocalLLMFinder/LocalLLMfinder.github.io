@@ -50,6 +50,18 @@ class ModelRetentionMetadata:
             raise ValueError("cleanup_eligible must be a boolean")
     
     def to_dict(self) -> Dict[str, Any]:
+        """Convert ModelRetentionMetadata to dictionary for JSON serialization."""
+        result = asdict(self)
+        
+        # Convert datetime objects to ISO strings
+        if isinstance(result.get('first_seen'), datetime):
+            result['first_seen'] = result['first_seen'].isoformat()
+        if isinstance(result.get('last_updated'), datetime):
+            result['last_updated'] = result['last_updated'].isoformat()
+        
+        return result
+    
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary with ISO format dates."""
         data = asdict(self)
         data['first_seen'] = self.first_seen.isoformat()

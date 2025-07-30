@@ -39,6 +39,10 @@ class PhaseResult:
     def __post_init__(self):
         if self.metrics is None:
             self.metrics = {}
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert PhaseResult to dictionary for JSON serialization."""
+        return asdict(self)
 
 @dataclass
 class UpdateReport:
@@ -73,6 +77,16 @@ class UpdateReport:
     def __post_init__(self):
         if self.errors_encountered is None:
             self.errors_encountered = []
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert UpdateReport to dictionary for JSON serialization."""
+        result = asdict(self)
+        
+        # Convert datetime to ISO string
+        if isinstance(result.get('timestamp'), datetime):
+            result['timestamp'] = result['timestamp'].isoformat()
+        
+        return result
 
 class ScheduledUpdateOrchestrator:
     """

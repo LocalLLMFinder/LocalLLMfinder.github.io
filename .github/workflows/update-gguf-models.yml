@@ -90,57 +90,39 @@ jobs:
           ENABLE_DETAILED_LOGGING: "true"
           PROGRESS_REPORT_INTERVAL: "900"  # 15 minutes
         run: |
-          # Retry logic for the main sync process
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          SUCCESS=false
+          # Single attempt - no retries, fail fast for debugging
+          echo "🚀 Starting sync (single attempt - no retries)"
+          echo "📊 Sync mode: $SYNC_MODE"
+          echo "⚡ Max concurrency: $MAX_CONCURRENCY"
+          echo "⏱️ Timeout: $TIMEOUT_HOURS hours"
           
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
-            echo "🚀 Starting sync attempt $((RETRY_COUNT + 1))/$MAX_RETRIES"
-            echo "📊 Sync mode: $SYNC_MODE"
-            echo "⚡ Max concurrency: $MAX_CONCURRENCY"
-            echo "⏱️ Timeout: $TIMEOUT_HOURS hours"
-            
-            # Record attempt start time
-            echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_start.txt
-            
-            if timeout ${TIMEOUT_HOURS}h python scripts/update_models.py; then
-              echo "✅ Sync completed successfully on attempt $((RETRY_COUNT + 1))"
-              SUCCESS=true
-              
-              # Record success metrics
-              echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_success.txt
-            else
-              EXIT_CODE=$?
-              echo "❌ Sync failed on attempt $((RETRY_COUNT + 1)) with exit code $EXIT_CODE"
-              
-              # Record failure metrics
-              echo "$(date -u +%s)" > reports/attempt_${RETRY_COUNT}_failure.txt
-              echo "$EXIT_CODE" > reports/attempt_${RETRY_COUNT}_exit_code.txt
-              
-              RETRY_COUNT=$((RETRY_COUNT + 1))
-              
-              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                # Exponential backoff with jitter
-                WAIT_TIME=$((2 ** RETRY_COUNT * 60 + RANDOM % 60))
-                echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
-                sleep $WAIT_TIME
-              fi
-            fi
-          done
+          # Record attempt start time
+          echo "$(date -u +%s)" > reports/attempt_start.txt
           
-          if [ "$SUCCESS" = false ]; then
-            echo "💥 All sync attempts failed after $MAX_RETRIES retries"
+          if timeout ${TIMEOUT_HOURS}h python scripts/update_models.py; then
+            echo "✅ Sync completed successfully"
             
-            # Create failure report
+            # Record success metrics
+            echo "$(date -u +%s)" > reports/attempt_success.txt
+          else
+            EXIT_CODE=$?
+            echo "❌ Sync failed with exit code $EXIT_CODE"
+            echo "🔍 Check the logs above for the exact error details"
+            
+            # Record failure metrics
+            echo "$(date -u +%s)" > reports/attempt_failure.txt
+            echo "$EXIT_CODE" > reports/attempt_exit_code.txt
+            
+            # Create failure report with detailed info
             echo "{
               \"status\": \"failed\",
-              \"total_attempts\": $MAX_RETRIES,
+              \"exit_code\": $EXIT_CODE,
               \"failure_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-              \"workflow_id\": \"$WORKFLOW_RUN_ID\"
+              \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+              \"message\": \"Single attempt failed - check logs for details\"
             }" > reports/sync_failure_report.json
             
-            exit 1
+            exit $EXIT_CODE
           fi
           
       - name: Collect performance metrics and verify files
@@ -282,47 +264,27 @@ jobs:
             
             🔗 Workflow: https://github.com/${{ github.repository }}/actions/runs/$WORKFLOW_RUN_ID"
             
-            # Enhanced push with retry logic and better error handling
-            PUSH_SUCCESS=false
-            for i in {1..5}; do
-              echo "📤 Attempting to push changes (attempt $i/5)..."
-              
-              if git push; then
-                echo "✅ Successfully pushed changes on attempt $i"
-                PUSH_SUCCESS=true
-                
-                # Record successful push
-                echo "{
-                  \"status\": \"success\",
-                  \"push_attempt\": $i,
-                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-                }" > reports/push_success.json
-                break
-              else
-                echo "⚠️ Push failed on attempt $i/5"
-                
-                if [ $i -lt 5 ]; then
-                  # Exponential backoff: 10, 20, 40, 80 seconds
-                  WAIT_TIME=$((10 * (2 ** (i - 1))))
-                  echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
-                  sleep $WAIT_TIME
-                  
-                  # Try to pull and rebase in case of conflicts
-                  echo "🔄 Attempting to pull and rebase..."
-                  git pull --rebase origin main || true
-                fi
-              fi
-            done
+            # Single push attempt - no retries, fail fast for debugging
+            echo "📤 Attempting to push changes (single attempt)..."
             
-            if [ "$PUSH_SUCCESS" = false ]; then
-              echo "💥 Failed to push changes after 5 attempts"
+            if git push; then
+              echo "✅ Successfully pushed changes"
+              
+              # Record successful push
+              echo "{
+                \"status\": \"success\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }" > reports/push_success.json
+            else
+              echo "❌ Push failed"
+              echo "🔍 Check git status and conflicts above for details"
               
               # Record push failure
               echo "{
                 \"status\": \"failed\",
-                \"total_attempts\": 5,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-                \"workflow_id\": \"$WORKFLOW_RUN_ID\"
+                \"workflow_id\": \"$WORKFLOW_RUN_ID\",
+                \"message\": \"Single push attempt failed - check git logs\"
               }" > reports/push_failure.json
               
               exit 1

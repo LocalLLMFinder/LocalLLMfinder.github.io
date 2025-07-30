@@ -659,7 +659,7 @@ class SyncModeManager:
             }
             
             async with aiofiles.open(self.config.last_sync_file, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(metadata_dict, indent=2))
+                await f.write(json.dumps(metadata_dict, indent=2, cls=DateTimeEncoder))
             
             logger.info(f"💾 Sync metadata saved to {self.config.last_sync_file}")
             
@@ -751,8 +751,13 @@ class AdaptiveRateLimiter:
         self.config = config
         self.has_token = has_token
         
-        # Calculate optimal rate limits
-        hourly_limit = config.authenticated_limit if has_token else config.anonymous_limit
+        # Calculate optimal rate limits - handle both config formats
+        if hasattr(config, 'authenticated_limit'):
+            # Old format from update_models.py
+            hourly_limit = config.authenticated_limit if has_token else config.anonymous_limit
+        else:
+            # New format from config_system.py
+            hourly_limit = config.requests_per_hour
         self.requests_per_second = hourly_limit / 3600.0  # Convert to per-second
         self.requests_per_minute = hourly_limit / 60.0    # Convert to per-minute
         
@@ -763,14 +768,16 @@ class AdaptiveRateLimiter:
         self.adaptive_factor = 1.0
         self._lock = asyncio.Lock()
         
-        # Concurrency control
-        self.semaphore = asyncio.Semaphore(config.max_concurrency)
+        # Concurrency control - handle both config formats
+        max_concurrency = getattr(config, 'max_concurrency', getattr(config, 'max_concurrent_requests', 50))
+        self.semaphore = asyncio.Semaphore(max_concurrency)
         
         logger.info(f"🚦 Initialized adaptive rate limiter:")
         logger.info(f"   • Mode: {'Authenticated' if has_token else 'Anonymous'}")
         logger.info(f"   • Rate limit: {hourly_limit} req/hour ({self.requests_per_second:.2f} req/sec)")
-        logger.info(f"   • Max concurrency: {config.max_concurrency}")
-        logger.info(f"   • Adaptive threshold: {config.adaptive_threshold}")
+        logger.info(f"   • Max concurrency: {max_concurrency}")
+        adaptive_threshold = getattr(config, 'adaptive_threshold', 0.8)
+        logger.info(f"   • Adaptive threshold: {adaptive_threshold}")
     
     async def __aenter__(self):
         """Acquire rate limit and concurrency control."""
@@ -873,8 +880,12 @@ class AdaptiveRateLimiter:
     
     async def _apply_intelligent_backoff(self):
         """Apply intelligent backoff with exponential increase and jitter."""
-        base_wait = self.config.base_backoff * (2 ** min(self.consecutive_rate_limits - 1, 6))
-        max_wait = min(base_wait, self.config.max_backoff)
+        # Handle both config formats for backoff
+        base_backoff = getattr(self.config, 'base_backoff', getattr(self.config, 'backoff_base', 1.0))
+        max_backoff = getattr(self.config, 'max_backoff', 60.0)
+        
+        base_wait = base_backoff * (2 ** min(self.consecutive_rate_limits - 1, 6))
+        max_wait = min(base_wait, max_backoff)
         
         # Add jitter to prevent synchronized retries
         jitter = random.uniform(0, self.config.jitter_factor * max_wait)
@@ -906,7 +917,7 @@ class AdaptiveRateLimiter:
             'consecutive_rate_limits': self.consecutive_rate_limits,
             'recent_success_rate': self._calculate_recent_success_rate(),
             'available_concurrency': self.semaphore._value,
-            'max_concurrency': self.config.max_concurrency
+            'max_concurrency': getattr(self.config, 'max_concurrency', getattr(self.config, 'max_concurrent_requests', 50))
         }
 
 class ParallelProcessingManager:
@@ -925,7 +936,8 @@ class ParallelProcessingManager:
         """Process items in parallel with progress tracking and metrics."""
         logger.info(f"🚀 Starting parallel processing: {batch_description}")
         logger.info(f"   • Total items: {len(items)}")
-        logger.info(f"   • Max concurrency: {self.rate_limiter.config.max_concurrency}")
+        max_concurrency = getattr(self.rate_limiter.config, 'max_concurrency', getattr(self.rate_limiter.config, 'max_concurrent_requests', 50))
+        logger.info(f"   • Max concurrency: {max_concurrency}")
         logger.info(f"   • Progress reports every: {self.progress_report_interval}s")
         
         self.metrics.total_requests = len(items)
@@ -1082,8 +1094,8 @@ class HuggingFaceDataFetcher:
             authenticated_limit=5000,  # 5000 req/hour for authenticated users
             anonymous_limit=1000,      # 1000 req/hour for anonymous users
             max_concurrency=max_concurrency,  # From environment variable
-            base_backoff=1.0,
-            max_backoff=60.0,
+            base_backoff=0.1,  # Minimal backoff for debugging
+            max_backoff=5.0,   # Short max backoff for debugging
             jitter_factor=0.1,
             adaptive_threshold=0.8
         )
@@ -1613,7 +1625,7 @@ class HuggingFaceDataFetcher:
         try:
             async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
                 # Use compact JSON format to reduce file size
-                json_str = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+                json_str = json.dumps(data, ensure_ascii=False, separators=(',', ':'), cls=DateTimeEncoder)
                 await f.write(json_str)
             
             # Log file size
@@ -1668,23 +1680,18 @@ class HuggingFaceDataFetcher:
             
 
             
-    async def _process_model_with_retry(self, model, max_retries: int = 3) -> Optional[Dict[str, Any]]:
-        """Process a model with comprehensive error handling and recovery."""
-        # Use the comprehensive error handling system
-        result = await with_error_handling(
-            self._process_model,
-            "process_model",
-            self.error_recovery_system,
-            model.id,  # model_id
-            None,      # url
-            model      # args for _process_model
-        )
-        
-        # Track failed models for reporting
-        if result is None:
+    async def _process_model_with_retry(self, model, max_retries: int = 1) -> Optional[Dict[str, Any]]:
+        """Process a model with no retries - fail fast for debugging."""
+        # Direct processing without retry logic for debugging
+        try:
+            result = await self._process_model(model)
+            return result
+        except Exception as e:
+            logger.error(f"❌ Failed to process model {model.id}: {e}")
+            # Track failed models for reporting
             self.failed_models.add(model.id)
-        
-        return result
+            # Re-raise the exception to stop execution and show the exact error
+            raise
             
     async def _process_model(self, model) -> Optional[Dict[str, Any]]:
         """Process a single model and extract GGUF file information with comprehensive error handling."""
@@ -2123,6 +2130,7 @@ class HuggingFaceDataFetcher:
         json_content = json.dumps(
             data, 
             separators=(',', ':'),  # No spaces for compression
+            cls=DateTimeEncoder,    # Handle datetime objects
             ensure_ascii=False,     # Allow Unicode for international content
             sort_keys=True          # Consistent ordering for better compression
         )
@@ -2472,7 +2480,7 @@ class HuggingFaceDataFetcher:
             
             # Write legacy gguf_models.json
             async with aiofiles.open('gguf_models.json', 'w', encoding='utf-8') as f:
-                json_content = json.dumps(legacy_models, indent=2, ensure_ascii=False)
+                json_content = json.dumps(legacy_models, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
                 await f.write(json_content)
             
             # Generate legacy gguf_models_estimated_sizes.json with freshness metadata
@@ -2490,7 +2498,7 @@ class HuggingFaceDataFetcher:
             
             # Write legacy size estimates file
             async with aiofiles.open('gguf_models_estimated_sizes.json', 'w', encoding='utf-8') as f:
-                json_content = json.dumps(size_estimates, indent=2, ensure_ascii=False)
+                json_content = json.dumps(size_estimates, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
                 await f.write(json_content)
             
             logger.info(f"✅ Generated legacy files: gguf_models.json ({len(legacy_models)} models)")
@@ -2757,6 +2765,54 @@ class HuggingFaceDataFetcher:
         logger.info("🤖 Generated robots.txt")
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+def serialize_models_data(models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Serialize models data by converting datetime objects to strings."""
+    serialized_models = []
+    
+    for model in models:
+        serialized_model = {}
+        for key, value in model.items():
+            if isinstance(value, datetime):
+                serialized_model[key] = value.isoformat()
+            elif isinstance(value, list):
+                # Handle lists that might contain datetime objects
+                serialized_list = []
+                for item in value:
+                    if isinstance(item, dict):
+                        serialized_item = {}
+                        for sub_key, sub_value in item.items():
+                            if isinstance(sub_value, datetime):
+                                serialized_item[sub_key] = sub_value.isoformat()
+                            else:
+                                serialized_item[sub_key] = sub_value
+                        serialized_list.append(serialized_item)
+                    elif isinstance(item, datetime):
+                        serialized_list.append(item.isoformat())
+                    else:
+                        serialized_list.append(item)
+                serialized_model[key] = serialized_list
+            elif isinstance(value, dict):
+                # Handle nested dictionaries
+                serialized_dict = {}
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_value, datetime):
+                        serialized_dict[sub_key] = sub_value.isoformat()
+                    else:
+                        serialized_dict[sub_key] = sub_value
+                serialized_model[key] = serialized_dict
+            else:
+                serialized_model[key] = value
+        serialized_models.append(serialized_model)
+    
+    return serialized_models
+
 async def generate_output_files(models: List[Dict[str, Any]]) -> None:
     """Generate output files for retention mode."""
     try:
@@ -2764,15 +2820,18 @@ async def generate_output_files(models: List[Dict[str, Any]]) -> None:
         data_dir = Path("data")
         data_dir.mkdir(exist_ok=True)
         
+        # Serialize models data to handle datetime objects
+        serialized_models = serialize_models_data(models)
+        
         # Generate main models JSON file
         models_file = data_dir / "gguf_models.json"
         async with aiofiles.open(models_file, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(models, indent=2, ensure_ascii=False))
+            await f.write(json.dumps(serialized_models, indent=2, ensure_ascii=False, cls=DateTimeEncoder))
         logger.info(f"📄 Generated {models_file}")
         
         # Generate estimated sizes file
         estimated_sizes = {}
-        for model in models:
+        for model in serialized_models:
             model_id = model.get('id', '')
             if model_id:
                 # Use existing size estimation logic or default
@@ -2780,11 +2839,11 @@ async def generate_output_files(models: List[Dict[str, Any]]) -> None:
         
         sizes_file = data_dir / "gguf_models_estimated_sizes.json"
         async with aiofiles.open(sizes_file, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(estimated_sizes, indent=2))
+            await f.write(json.dumps(estimated_sizes, indent=2, cls=DateTimeEncoder))
         logger.info(f"📄 Generated {sizes_file}")
         
         # Generate sitemap
-        await generate_sitemap_file(models)
+        await generate_sitemap_file(serialized_models)
         
         # Generate robots.txt
         await generate_robots_file()
@@ -2859,7 +2918,7 @@ async def save_retention_metadata(sync_metadata: Optional[SyncMetadata], update_
             
             metadata_file = data_dir / "last_sync_metadata.json"
             async with aiofiles.open(metadata_file, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(metadata_dict, indent=2))
+                await f.write(json.dumps(metadata_dict, indent=2, cls=DateTimeEncoder))
             logger.info(f"💾 Saved sync metadata to {metadata_file}")
         
         # Save retention report
@@ -2878,7 +2937,7 @@ async def save_retention_metadata(sync_metadata: Optional[SyncMetadata], update_
             
             report_file = reports_dir / f"retention_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
             async with aiofiles.open(report_file, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(report_dict, indent=2))
+                await f.write(json.dumps(report_dict, indent=2, cls=DateTimeEncoder))
             logger.info(f"📊 Saved retention report to {report_file}")
         
     except Exception as e:
@@ -3268,7 +3327,11 @@ async def main():
         if retention_mode == RetentionMode.FULL and 'fetcher' in locals():
             if hasattr(fetcher, 'rate_limiter') and hasattr(fetcher.rate_limiter, 'config'):
                 # Update rate limiter configuration
-                fetcher.rate_limiter.config.max_concurrency = optimal_params.max_concurrency
+                # Update max concurrency - handle both config formats
+                if hasattr(fetcher.rate_limiter.config, 'max_concurrency'):
+                    fetcher.rate_limiter.config.max_concurrency = optimal_params.max_concurrency
+                elif hasattr(fetcher.rate_limiter.config, 'max_concurrent_requests'):
+                    fetcher.rate_limiter.config.max_concurrent_requests = optimal_params.max_concurrency
                 fetcher.rate_limiter.adaptive_factor *= optimal_params.rate_limit_factor
                 logger.info(f"🔧 Updated rate limiter: concurrency={optimal_params.max_concurrency}, "
                            f"rate_factor={optimal_params.rate_limit_factor:.2f}")
@@ -3570,7 +3633,7 @@ async def main():
                 
                 performance_file = reports_dir / "performance_metrics.json"
                 async with aiofiles.open(performance_file, 'w', encoding='utf-8') as f:
-                    await f.write(json.dumps(performance_metrics, indent=2))
+                    await f.write(json.dumps(performance_metrics, indent=2, cls=DateTimeEncoder))
                 
                 logger.info(f"📊 Performance metrics saved to {performance_file}")
                 

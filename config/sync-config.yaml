@@ -16,24 +16,24 @@ workflow_timeout_hours: 6
 enable_github_actions_integration: true
 enable_pages_deployment: true
 
-# Rate limiting configuration
+# Rate limiting configuration - Fail fast for debugging
 rate_limiting:
-  requests_per_second: 1.2
+  requests_per_second: 2.0  # Increased from 1.2
   requests_per_hour: 5000
-  max_concurrent_requests: 50
-  backoff_base: 2.0
+  max_concurrent_requests: 25  # Reduced to avoid overwhelming API
+  backoff_base: 1.5  # Reduced from 2.0
   backoff_jitter: true
-  max_retries: 5
-  timeout_seconds: 30
+  max_retries: 1  # No retries - fail fast
+  timeout_seconds: 20  # Reduced from 30
 
-# Sync behavior configuration
+# Sync behavior configuration - Optimized for speed
 sync_behavior:
   mode: full  # auto, incremental, full
   incremental_window_hours: 48
   full_sync_threshold_hours: 168  # Weekly full sync
   significant_change_threshold: 0.1  # 10% change triggers full sync
   force_full_sync: true
-  enable_multi_strategy_discovery: true
+  enable_multi_strategy_discovery: false  # DISABLED for speed - use only primary GGUF filter
   enable_deduplication: true
 
 # Data validation configuration
@@ -46,14 +46,14 @@ validation:
   enable_automatic_fixes: true
   validation_timeout_seconds: 300
 
-# Error handling configuration
+# Error handling configuration - Fail fast for debugging
 error_handling:
-  enable_error_recovery: true
-  enable_exponential_backoff: true
+  enable_error_recovery: false  # Disabled for debugging
+  enable_exponential_backoff: false  # Disabled for debugging
   enable_categorized_errors: true
   enable_notifications: true
-  max_recovery_attempts: 3
-  recovery_delay_seconds: 60
+  max_recovery_attempts: 1  # No retries
+  recovery_delay_seconds: 0  # No delays
   preserve_data_on_failure: true
 
 # Monitoring and alerting configuration
@@ -68,16 +68,16 @@ monitoring:
     - github
   enable_dashboard: false
 
-# Performance optimization configuration
+# Performance optimization configuration - Optimized for speed
 performance:
   enable_streaming_processing: true
-  enable_data_compression: true
+  enable_data_compression: false  # Disabled to reduce processing time
   enable_caching: true
   cache_ttl_hours: 24
   memory_limit_mb: 2048
   enable_parallel_processing: true
-  chunk_size: 100
-  enable_adaptive_parameters: true
+  chunk_size: 200  # Increased from 100 for better batching
+  enable_adaptive_parameters: false  # Disabled to reduce overhead
 
 # Storage configuration
 storage:
