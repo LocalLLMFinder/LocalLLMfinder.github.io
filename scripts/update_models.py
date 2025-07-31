@@ -3449,9 +3449,25 @@ async def main():
                 
                 # Save retention report if available
                 if 'update_report' in locals() and update_report:
-                    from retention_data_models import RetentionDataStorage
+                    from retention_data_models import RetentionDataStorage, UpdateReport as RetentionUpdateReport
                     storage = RetentionDataStorage()
-                    storage.save_report(update_report)
+                    
+                    # Convert scheduled_update_orchestrator.UpdateReport to retention_data_models.UpdateReport
+                    retention_report = RetentionUpdateReport(
+                        timestamp=update_report.timestamp,
+                        duration_seconds=update_report.total_duration_seconds,
+                        recent_models_fetched=update_report.recent_models_fetched,
+                        top_models_updated=update_report.top_models_updated,
+                        models_merged=update_report.models_merged,
+                        duplicates_removed=update_report.duplicates_removed,
+                        models_cleaned_up=update_report.models_cleaned_up,
+                        storage_freed_mb=update_report.storage_freed_mb,
+                        api_calls_made=update_report.api_calls_made,
+                        errors_encountered=update_report.errors_encountered or [],
+                        success=update_report.overall_success
+                    )
+                    
+                    storage.save_report(retention_report)
                     logger.info("📊 Retention report saved")
                     
                     # Create error report from retention report
