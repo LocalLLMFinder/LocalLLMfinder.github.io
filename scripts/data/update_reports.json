@@ -1,0 +1,41 @@
+[
+  {
+    "timestamp": "2025-07-31T05:13:39.267405+00:00",
+    "duration_seconds": 117.589169,
+    "recent_models_fetched": 1358,
+    "top_models_updated": 5,
+    "models_merged": 1363,
+    "duplicates_removed": 0,
+    "models_cleaned_up": 0,
+    "storage_freed_mb": 0.0,
+    "api_calls_made": 2,
+    "errors_encountered": [],
+    "success": true
+  },
+  {
+    "timestamp": "2025-07-31T05:17:50.622848+00:00",
+    "duration_seconds": 83.970307,
+    "recent_models_fetched": 542,
+    "top_models_updated": 3,
+    "models_merged": 545,
+    "duplicates_removed": 0,
+    "models_cleaned_up": 0,
+    "storage_freed_mb": 0.0,
+    "api_calls_made": 2,
+    "errors_encountered": [],
+    "success": true
+  },
+  {
+    "timestamp": "2025-07-31T05:32:16.061025+00:00",
+    "duration_seconds": 93.76201,
+    "recent_models_fetched": 543,
+    "top_models_updated": 3,
+    "models_merged": 546,
+    "duplicates_removed": 0,
+    "models_cleaned_up": 0,
+    "storage_freed_mb": 0.0,
+    "api_calls_made": 2,
+    "errors_encountered": [],
+    "success": true
+  }
+]

@@ -2478,8 +2478,13 @@ class HuggingFaceDataFetcher:
                 }
                 legacy_models.append(legacy_model)
             
-            # Write legacy gguf_models.json
-            async with aiofiles.open('gguf_models.json', 'w', encoding='utf-8') as f:
+            # Write legacy gguf_models.json to website output directory for index.html
+            website_output_dir = Path(self.sync_config.storage.website_output_directory)
+            root_gguf_file = website_output_dir / 'gguf_models.json'
+            
+            # Ensure website output directory exists
+            website_output_dir.mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(root_gguf_file, 'w', encoding='utf-8') as f:
                 json_content = json.dumps(legacy_models, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
                 await f.write(json_content)
             
@@ -2496,12 +2501,13 @@ class HuggingFaceDataFetcher:
                         'freshnessStatus': model.get('freshnessStatus', 'unknown')
                     }
             
-            # Write legacy size estimates file
-            async with aiofiles.open('gguf_models_estimated_sizes.json', 'w', encoding='utf-8') as f:
+            # Write legacy size estimates file to root directory
+            root_sizes_file = Path(__file__).parent.parent / 'gguf_models_estimated_sizes.json'
+            async with aiofiles.open(root_sizes_file, 'w', encoding='utf-8') as f:
                 json_content = json.dumps(size_estimates, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
                 await f.write(json_content)
             
-            logger.info(f"✅ Generated legacy files: gguf_models.json ({len(legacy_models)} models)")
+            logger.info(f"✅ Generated legacy files in root directory: gguf_models.json ({len(legacy_models)} models)")
             
         except Exception as e:
             logger.error(f"❌ Failed to generate legacy files: {e}")
@@ -2519,16 +2525,16 @@ class HuggingFaceDataFetcher:
         total_size = 0
         logger.info("📊 Generated file statistics:")
         
-        # Check legacy files first
+        # Check legacy files first (in root directory)
         for filename in legacy_files:
-            file_path = Path(filename)
+            file_path = Path(__file__).parent.parent / filename
             if file_path.exists():
                 size_bytes = file_path.stat().st_size
                 size_mb = size_bytes / (1024 * 1024)
                 total_size += size_bytes
-                logger.info(f"   • {filename}: {size_mb:.2f} MB ({size_bytes:,} bytes) [legacy]")
+                logger.info(f"   • {filename}: {size_mb:.2f} MB ({size_bytes:,} bytes) [legacy - root]")
             else:
-                logger.warning(f"   • {filename}: NOT FOUND [legacy]")
+                logger.warning(f"   • {filename}: NOT FOUND [legacy - root]")
         
         # Check data directory files
         for filename in files_to_check:
@@ -3188,13 +3194,18 @@ async def main():
                     if update_report.overall_success:
                         # Get the final merged models from the orchestrator's merge phase
                         models = []
+                        logger.info(f"🔍 Checking merge phase: merge_phase={update_report.merge_phase is not None}")
+                        if update_report.merge_phase:
+                            logger.info(f"🔍 Merge phase success: {update_report.merge_phase.success}")
+                            logger.info(f"🔍 Merge phase metrics keys: {list(update_report.merge_phase.metrics.keys()) if update_report.merge_phase.metrics else 'None'}")
+                        
                         if (update_report.merge_phase and 
                             update_report.merge_phase.success and 
                             'merged_models' in update_report.merge_phase.metrics):
                             
                             # Convert ModelReference objects to dict format expected by the rest of the pipeline
                             merged_models = update_report.merge_phase.metrics['merged_models']
-                            models = []
+                            logger.info(f"🔍 Found {len(merged_models)} merged models to process")
                             
                             for model_ref in merged_models:
                                 if hasattr(model_ref, 'metadata') and model_ref.metadata:
@@ -3239,6 +3250,86 @@ async def main():
                             "retention_phases_completed": update_report.phases_completed,
                             "retention_phases_failed": update_report.phases_failed
                         })
+                        
+                        # Transform and copy the generated gguf_models.json to legacy format for index.html
+                        try:
+                            import shutil
+                            import json
+                            data_gguf_file = Path(config.storage.data_directory) / "gguf_models.json"
+                            website_gguf_file = Path(config.storage.website_output_directory) / "gguf_models.json"
+                            
+                            if data_gguf_file.exists():
+                                # Load the retention workflow data
+                                with open(data_gguf_file, 'r', encoding='utf-8') as f:
+                                    retention_models = json.load(f)
+                                
+                                # Transform to legacy format expected by website
+                                legacy_models = []
+                                for model in retention_models:
+                                    model_id = model.get('id', '')
+                                    
+                                    # Extract family and name from model ID
+                                    if '/' in model_id:
+                                        parts = model_id.split('/')
+                                        family = parts[0]
+                                        name = '/'.join(parts[1:]) if len(parts) > 1 else parts[0]
+                                    else:
+                                        family = 'Unknown'
+                                        name = model_id
+                                    
+                                    # Extract architecture from tags or model name
+                                    architecture = 'Unknown'
+                                    tags = model.get('tags', [])
+                                    for tag in tags:
+                                        if any(arch in tag.lower() for arch in ['llama', 'mistral', 'gemma', 'qwen', 'phi', 'deepseek']):
+                                            architecture = tag.split(':')[-1] if ':' in tag else tag
+                                            break
+                                    
+                                    # If no architecture found in tags, try to extract from model name
+                                    if architecture == 'Unknown':
+                                        model_name_lower = model_id.lower()
+                                        if 'llama' in model_name_lower:
+                                            architecture = 'Llama'
+                                        elif 'mistral' in model_name_lower:
+                                            architecture = 'Mistral'
+                                        elif 'gemma' in model_name_lower:
+                                            architecture = 'Gemma'
+                                        elif 'qwen' in model_name_lower:
+                                            architecture = 'Qwen'
+                                        elif 'phi' in model_name_lower:
+                                            architecture = 'Phi'
+                                        elif 'deepseek' in model_name_lower:
+                                            architecture = 'DeepSeek'
+                                    
+                                    legacy_model = {
+                                        'modelId': model_id,
+                                        'files': [{'filename': f.get('filename', f.get('name', ''))} 
+                                                 for f in model.get('files', [])],
+                                        'downloads': model.get('downloads', 0),
+                                        'lastModified': model.get('lastModified') or model.get('created_at'),
+                                        'family': family,
+                                        'name': name,
+                                        'architecture': architecture,
+                                        # Add freshness fields
+                                        'lastSynced': model.get('lastSynced'),
+                                        'freshnessStatus': model.get('freshnessStatus', 'unknown'),
+                                        'hoursSinceModified': model.get('hoursSinceModified'),
+                                        'hoursSinceSynced': model.get('hoursSinceSynced', 0.0)
+                                    }
+                                    legacy_models.append(legacy_model)
+                                
+                                # Ensure website output directory exists
+                                website_gguf_file.parent.mkdir(parents=True, exist_ok=True)
+                                
+                                # Write legacy format to website output directory
+                                with open(website_gguf_file, 'w', encoding='utf-8') as f:
+                                    json.dump(legacy_models, f, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
+                                
+                                logger.info(f"✅ Transformed and saved {len(legacy_models)} models to legacy format at {website_gguf_file} for index.html")
+                            else:
+                                logger.warning(f"⚠️ Data file {data_gguf_file} not found, cannot transform to legacy format")
+                        except Exception as copy_error:
+                            logger.error(f"❌ Failed to transform gguf_models.json to legacy format: {copy_error}")
                         
                     else:
                         logger.error("❌ Retention workflow failed")

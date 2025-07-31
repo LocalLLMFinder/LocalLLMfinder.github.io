@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-07-31T05:13:39.267405+00:00",
+  "backup_type": "pre_update",
+  "files_backed_up": 0,
+  "backup_directory": "data\\backups\\pre_update_20250731_084339",
+  "retention_config": {
+    "retention_days": 7,
+    "top_models_count": 5,
+    "update_schedule_cron": "0 2 * * *",
+    "enable_cleanup": true,
+    "cleanup_batch_size": 100,
+    "preserve_download_threshold": 1000,
+    "enable_ranking_history": true,
+    "ranking_history_days": 90,
+    "enable_retention_mode": false,
+    "recent_models_priority": true,
+    "top_models_storage_path": "data/top_models.json",
+    "retention_metadata_path": "data/retention_metadata.json"
+  }
+}

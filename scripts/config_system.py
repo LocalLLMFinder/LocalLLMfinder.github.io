@@ -113,6 +113,7 @@ class StorageConfig:
     backup_directory: str = "data/backups"
     reports_directory: str = "reports"
     logs_directory: str = "logs"
+    website_output_directory: str = "."  # Root directory for website files like gguf_models.json
     enable_backups: bool = True
     backup_retention_days: int = 30
     enable_compression: bool = True

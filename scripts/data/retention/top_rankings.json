@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-07-31T05:32:16.723508+00:00",
+  "rankings": [
+    {
+      "model_id": "ggml-org/models-moved",
+      "rank": 1,
+      "download_count": 2424037,
+      "previous_rank": 1,
+      "rank_change": 0,
+      "days_in_top": 3,
+      "first_top_date": "2025-07-31T05:13:40.359780+00:00",
+      "last_updated": "2025-07-31T05:32:16.718355+00:00"
+    },
+    {
+      "model_id": "mixedbread-ai/mxbai-embed-large-v1",
+      "rank": 2,
+      "download_count": 2004686,
+      "previous_rank": 2,
+      "rank_change": 0,
+      "days_in_top": 3,
+      "first_top_date": "2025-07-31T05:13:40.359780+00:00",
+      "last_updated": "2025-07-31T05:32:16.718355+00:00"
+    },
+    {
+      "model_id": "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
+      "rank": 3,
+      "download_count": 753619,
+      "previous_rank": 3,
+      "rank_change": 0,
+      "days_in_top": 3,
+      "first_top_date": "2025-07-31T05:13:40.359780+00:00",
+      "last_updated": "2025-07-31T05:32:16.718355+00:00"
+    }
+  ],
+  "total_rankings": 3
+}
