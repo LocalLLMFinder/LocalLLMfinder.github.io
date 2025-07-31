@@ -17,6 +17,16 @@ import os
 logger = logging.getLogger(__name__)
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects by converting them to ISO format strings."""
+    
+    def default(self, obj):
+        """Override default method to handle datetime objects."""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 @dataclass
 class ModelRetentionMetadata:
     """Metadata for model retention tracking."""
@@ -60,13 +70,6 @@ class ModelRetentionMetadata:
             result['last_updated'] = result['last_updated'].isoformat()
         
         return result
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary with ISO format dates."""
-        data = asdict(self)
-        data['first_seen'] = self.first_seen.isoformat()
-        data['last_updated'] = self.last_updated.isoformat()
-        return data
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ModelRetentionMetadata':
@@ -197,14 +200,50 @@ class RetentionDataStorage:
         self.reports_file = self.base_path / "update_reports.json"
     
     def save_metadata(self, metadata_list: List[ModelRetentionMetadata]) -> None:
-        """Save model retention metadata to JSON file."""
+        """Save model retention metadata to JSON file with comprehensive error handling."""
         try:
-            data = [item.to_dict() for item in metadata_list]
+            logger.debug(f"Starting save_metadata for {len(metadata_list)} records")
+            
+            # Validate input
+            if not isinstance(metadata_list, list):
+                raise TypeError(f"Expected list of ModelRetentionMetadata, got {type(metadata_list)}")
+            
+            # Convert to dict with individual error handling
+            data = []
+            failed_conversions = []
+            
+            for i, item in enumerate(metadata_list):
+                try:
+                    if not isinstance(item, ModelRetentionMetadata):
+                        raise TypeError(f"Item {i} is not ModelRetentionMetadata: {type(item)}")
+                    
+                    item_dict = item.to_dict()
+                    data.append(item_dict)
+                    
+                except Exception as convert_error:
+                    logger.warning(f"Failed to convert metadata item {i} (model_id: {getattr(item, 'model_id', 'unknown')}): {convert_error}")
+                    failed_conversions.append((i, str(convert_error)))
+            
+            if failed_conversions:
+                logger.warning(f"Failed to convert {len(failed_conversions)} metadata items out of {len(metadata_list)}")
+                for idx, error in failed_conversions:
+                    logger.warning(f"  Item {idx}: {error}")
+            
+            if not data:
+                raise ValueError("No valid metadata items to save after conversion")
+            
+            # Save with error handling
             self._save_json(self.metadata_file, data)
-            logger.info(f"Saved {len(metadata_list)} metadata records")
-        except Exception as e:
-            logger.error(f"Failed to save metadata: {e}")
+            logger.info(f"Successfully saved {len(data)} metadata records ({len(failed_conversions)} failed)")
+            
+        except (TypeError, ValueError) as e:
+            logger.error(f"Data validation error in save_metadata: {e}")
+            logger.error(f"Input type: {type(metadata_list)}, Length: {len(metadata_list) if hasattr(metadata_list, '__len__') else 'N/A'}")
             raise
+        except Exception as e:
+            logger.error(f"Unexpected error in save_metadata: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            raise RuntimeError(f"Metadata save failed: {e}")
     
     def load_metadata(self) -> List[ModelRetentionMetadata]:
         """Load model retention metadata from JSON file."""
@@ -218,14 +257,50 @@ class RetentionDataStorage:
             return []
     
     def save_rankings(self, rankings_list: List[TopModelRanking]) -> None:
-        """Save top model rankings to JSON file."""
+        """Save top model rankings to JSON file with comprehensive error handling."""
         try:
-            data = [item.to_dict() for item in rankings_list]
+            logger.debug(f"Starting save_rankings for {len(rankings_list)} records")
+            
+            # Validate input
+            if not isinstance(rankings_list, list):
+                raise TypeError(f"Expected list of TopModelRanking, got {type(rankings_list)}")
+            
+            # Convert to dict with individual error handling
+            data = []
+            failed_conversions = []
+            
+            for i, item in enumerate(rankings_list):
+                try:
+                    if not isinstance(item, TopModelRanking):
+                        raise TypeError(f"Item {i} is not TopModelRanking: {type(item)}")
+                    
+                    item_dict = item.to_dict()
+                    data.append(item_dict)
+                    
+                except Exception as convert_error:
+                    logger.warning(f"Failed to convert ranking item {i} (model_id: {getattr(item, 'model_id', 'unknown')}, rank: {getattr(item, 'rank', 'unknown')}): {convert_error}")
+                    failed_conversions.append((i, str(convert_error)))
+            
+            if failed_conversions:
+                logger.warning(f"Failed to convert {len(failed_conversions)} ranking items out of {len(rankings_list)}")
+                for idx, error in failed_conversions:
+                    logger.warning(f"  Item {idx}: {error}")
+            
+            if not data:
+                raise ValueError("No valid ranking items to save after conversion")
+            
+            # Save with error handling
             self._save_json(self.rankings_file, data)
-            logger.info(f"Saved {len(rankings_list)} ranking records")
-        except Exception as e:
-            logger.error(f"Failed to save rankings: {e}")
+            logger.info(f"Successfully saved {len(data)} ranking records ({len(failed_conversions)} failed)")
+            
+        except (TypeError, ValueError) as e:
+            logger.error(f"Data validation error in save_rankings: {e}")
+            logger.error(f"Input type: {type(rankings_list)}, Length: {len(rankings_list) if hasattr(rankings_list, '__len__') else 'N/A'}")
             raise
+        except Exception as e:
+            logger.error(f"Unexpected error in save_rankings: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            raise RuntimeError(f"Rankings save failed: {e}")
     
     def load_rankings(self) -> List[TopModelRanking]:
         """Load top model rankings from JSON file."""
@@ -239,23 +314,70 @@ class RetentionDataStorage:
             return []
     
     def save_report(self, report: UpdateReport) -> None:
-        """Save update report to JSON file (append to list)."""
+        """Save update report to JSON file (append to list) with comprehensive error handling."""
         try:
-            # Load existing reports
-            reports = self._load_json(self.reports_file, [])
+            # Validate report before processing
+            if not isinstance(report, UpdateReport):
+                raise TypeError(f"Expected UpdateReport instance, got {type(report)}")
+            
+            logger.debug(f"Starting save_report for report with timestamp: {report.timestamp}")
+            
+            # Load existing reports with error handling
+            try:
+                reports = self._load_json(self.reports_file, [])
+                logger.debug(f"Loaded {len(reports)} existing reports")
+            except Exception as load_error:
+                logger.warning(f"Failed to load existing reports, starting with empty list: {load_error}")
+                reports = []
+            
+            # Convert report to dict with error handling
+            try:
+                report_dict = report.to_dict()
+                logger.debug(f"Successfully converted report to dict with keys: {list(report_dict.keys())}")
+            except Exception as convert_error:
+                logger.error(f"Failed to convert report to dict: {convert_error}")
+                logger.error(f"Report object: {report}")
+                raise RuntimeError(f"Report serialization failed during to_dict(): {convert_error}")
             
             # Add new report
-            reports.append(report.to_dict())
+            reports.append(report_dict)
             
             # Keep only last 100 reports to prevent file from growing too large
             if len(reports) > 100:
                 reports = reports[-100:]
+                logger.debug(f"Trimmed reports list to last 100 entries")
             
-            self._save_json(self.reports_file, reports)
-            logger.info("Saved update report")
-        except Exception as e:
-            logger.error(f"Failed to save report: {e}")
+            # Save with comprehensive error handling
+            try:
+                self._save_json(self.reports_file, reports)
+                logger.info(f"Successfully saved update report (total reports: {len(reports)})")
+            except Exception as save_error:
+                logger.error(f"Failed to save reports to {self.reports_file}: {save_error}")
+                
+                # Attempt to save just the current report as backup
+                try:
+                    backup_file = self.reports_file.with_suffix('.single_report_backup.json')
+                    self._save_json(backup_file, [report_dict])
+                    logger.warning(f"Saved current report as backup to {backup_file}")
+                except Exception as backup_error:
+                    logger.error(f"Failed to save report backup: {backup_error}")
+                
+                raise RuntimeError(f"Report save failed: {save_error}")
+                
+        except TypeError as e:
+            logger.error(f"Type error in save_report: {e}")
+            logger.error(f"Report type: {type(report)}, Report value: {report}")
             raise
+        except ValueError as e:
+            logger.error(f"Value error in save_report: {e}")
+            logger.error(f"Report validation may have failed: {report}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in save_report: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Report details: timestamp={getattr(report, 'timestamp', 'N/A')}, "
+                        f"success={getattr(report, 'success', 'N/A')}")
+            raise RuntimeError(f"Unexpected error during report save: {e}")
     
     def load_reports(self, limit: Optional[int] = None) -> List[UpdateReport]:
         """Load update reports from JSON file."""
@@ -273,29 +395,214 @@ class RetentionDataStorage:
             return []
     
     def _save_json(self, file_path: Path, data: Any) -> None:
-        """Save data to JSON file with atomic write."""
+        """Save data to JSON file with atomic write using custom DateTimeEncoder and comprehensive error handling."""
         temp_file = file_path.with_suffix('.tmp')
+        
         try:
+            # Primary serialization attempt with custom encoder
             with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(data, f, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
             
             # Atomic move
             temp_file.replace(file_path)
-        except Exception as e:
+            logger.debug(f"Successfully saved JSON data to {file_path}")
+            
+        except (TypeError, ValueError) as e:
+            # Handle JSON serialization errors specifically
+            logger.error(f"JSON serialization error for {file_path}: {e}")
+            logger.error(f"Data type causing error: {type(data)}")
+            
+            # Clean up temp file
             if temp_file.exists():
                 temp_file.unlink()
-            raise e
+            
+            # Attempt fallback serialization
+            try:
+                logger.info(f"Attempting fallback serialization for {file_path}")
+                self._fallback_save_json(file_path, data)
+                logger.warning(f"Fallback serialization succeeded for {file_path}")
+            except Exception as fallback_error:
+                logger.error(f"Fallback serialization also failed for {file_path}: {fallback_error}")
+                raise RuntimeError(f"Both primary and fallback serialization failed for {file_path}. "
+                                 f"Primary error: {e}, Fallback error: {fallback_error}")
+        
+        except (IOError, OSError, PermissionError) as e:
+            # Handle file system errors
+            logger.error(f"File system error while saving {file_path}: {e}")
+            
+            # Clean up temp file
+            if temp_file.exists():
+                temp_file.unlink()
+            
+            # Try alternative temp file location
+            try:
+                logger.info(f"Attempting save with alternative temp file for {file_path}")
+                alt_temp_file = file_path.with_suffix(f'.tmp_{os.getpid()}')
+                with open(alt_temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
+                alt_temp_file.replace(file_path)
+                logger.warning(f"Alternative temp file save succeeded for {file_path}")
+            except Exception as alt_error:
+                logger.error(f"Alternative temp file save also failed for {file_path}: {alt_error}")
+                raise RuntimeError(f"File system error persists for {file_path}. "
+                                 f"Original error: {e}, Alternative error: {alt_error}")
+        
+        except Exception as e:
+            # Handle any other unexpected errors
+            logger.error(f"Unexpected error while saving {file_path}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            
+            # Clean up temp file
+            if temp_file.exists():
+                temp_file.unlink()
+            
+            raise RuntimeError(f"Unexpected error during JSON save for {file_path}: {e}")
+    
+    def _fallback_save_json(self, file_path: Path, data: Any) -> None:
+        """Fallback serialization mechanism that converts problematic objects to strings."""
+        logger.info(f"Starting fallback serialization for {file_path}")
+        
+        try:
+            # Convert data to a more serializable format
+            serializable_data = self._make_serializable(data)
+            
+            temp_file = file_path.with_suffix('.fallback_tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(serializable_data, f, indent=2, ensure_ascii=False, default=str)
+            
+            # Atomic move
+            temp_file.replace(file_path)
+            logger.info(f"Fallback serialization completed for {file_path}")
+            
+        except Exception as e:
+            # Clean up fallback temp file
+            fallback_temp = file_path.with_suffix('.fallback_tmp')
+            if fallback_temp.exists():
+                fallback_temp.unlink()
+            
+            logger.error(f"Fallback serialization failed for {file_path}: {e}")
+            raise
+    
+    def _make_serializable(self, obj: Any) -> Any:
+        """Convert objects to JSON-serializable format with detailed logging."""
+        if obj is None or isinstance(obj, (str, int, float, bool)):
+            return obj
+        
+        elif isinstance(obj, datetime):
+            logger.debug(f"Converting datetime object: {obj}")
+            return obj.isoformat()
+        
+        elif isinstance(obj, dict):
+            logger.debug(f"Processing dictionary with {len(obj)} keys")
+            result = {}
+            for key, value in obj.items():
+                try:
+                    result[str(key)] = self._make_serializable(value)
+                except Exception as e:
+                    logger.warning(f"Failed to serialize dict key '{key}': {e}, converting to string")
+                    result[str(key)] = str(value)
+            return result
+        
+        elif isinstance(obj, (list, tuple)):
+            logger.debug(f"Processing {type(obj).__name__} with {len(obj)} items")
+            result = []
+            for i, item in enumerate(obj):
+                try:
+                    result.append(self._make_serializable(item))
+                except Exception as e:
+                    logger.warning(f"Failed to serialize {type(obj).__name__} item {i}: {e}, converting to string")
+                    result.append(str(item))
+            return result
+        
+        elif hasattr(obj, 'to_dict'):
+            logger.debug(f"Using to_dict() method for {type(obj).__name__}")
+            try:
+                return self._make_serializable(obj.to_dict())
+            except Exception as e:
+                logger.warning(f"to_dict() method failed for {type(obj).__name__}: {e}, converting to string")
+                return str(obj)
+        
+        elif hasattr(obj, '__dict__'):
+            logger.debug(f"Using __dict__ for {type(obj).__name__}")
+            try:
+                return self._make_serializable(obj.__dict__)
+            except Exception as e:
+                logger.warning(f"__dict__ serialization failed for {type(obj).__name__}: {e}, converting to string")
+                return str(obj)
+        
+        else:
+            logger.debug(f"Converting {type(obj).__name__} to string")
+            return str(obj)
     
     def _load_json(self, file_path: Path, default: Any = None) -> Any:
-        """Load data from JSON file with error handling."""
+        """Load data from JSON file with comprehensive error handling."""
         if not file_path.exists():
+            logger.debug(f"File {file_path} does not exist, returning default value")
             return default
         
         try:
+            logger.debug(f"Loading JSON data from {file_path}")
             with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning(f"Failed to load {file_path}: {e}, using default")
+                data = json.load(f)
+            
+            logger.debug(f"Successfully loaded JSON data from {file_path} (type: {type(data)})")
+            return data
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in {file_path}: {e}")
+            logger.error(f"Error at line {e.lineno}, column {e.colno}: {e.msg}")
+            
+            # Try to read file content for debugging
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                logger.error(f"File content length: {len(content)} characters")
+                if len(content) < 1000:  # Only log small files
+                    logger.error(f"File content: {content}")
+                else:
+                    logger.error(f"File content (first 500 chars): {content[:500]}...")
+            except Exception as read_error:
+                logger.error(f"Could not read file content for debugging: {read_error}")
+            
+            logger.warning(f"Using default value due to JSON decode error")
+            return default
+            
+        except (IOError, OSError, PermissionError) as e:
+            logger.error(f"File system error loading {file_path}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            
+            # Check file permissions and size
+            try:
+                stat = file_path.stat()
+                logger.error(f"File size: {stat.st_size} bytes, mode: {oct(stat.st_mode)}")
+            except Exception as stat_error:
+                logger.error(f"Could not get file stats: {stat_error}")
+            
+            logger.warning(f"Using default value due to file system error")
+            return default
+            
+        except UnicodeDecodeError as e:
+            logger.error(f"Unicode decode error in {file_path}: {e}")
+            logger.error(f"Error at position {e.start}-{e.end}: {e.reason}")
+            
+            # Try different encodings
+            for encoding in ['latin-1', 'cp1252', 'utf-16']:
+                try:
+                    logger.info(f"Attempting to read {file_path} with {encoding} encoding")
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        data = json.load(f)
+                    logger.warning(f"Successfully loaded {file_path} using {encoding} encoding")
+                    return data
+                except Exception as encoding_error:
+                    logger.debug(f"Failed to load with {encoding}: {encoding_error}")
+            
+            logger.warning(f"All encoding attempts failed, using default value")
+            return default
+            
+        except Exception as e:
+            logger.error(f"Unexpected error loading {file_path}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.warning(f"Using default value due to unexpected error")
             return default
     
     def validate_storage_integrity(self) -> Dict[str, bool]:
